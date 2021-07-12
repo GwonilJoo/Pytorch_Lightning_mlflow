@@ -151,7 +151,7 @@ def go_pl():
 
     mlf_logger = MLFlowLogger(
         experiment_name="default",
-        tracking_uri="file:./ml-runs"
+        tracking_uri="file:./mlruns"
     )
 
     # trainer
