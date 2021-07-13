@@ -64,8 +64,6 @@ def go_pytorch():
 
 # pl version
 def go_pl():
-    pl.seed_everything(args.seed)
-
     # dataloader
     test_loader = make_dataloader()
 
@@ -76,6 +74,7 @@ def go_pl():
     # trainer
     trainer = pl.Trainer(gpus=args.n_gpus)
     trainer.test(model, test_loader)
+
 
 
 def main():

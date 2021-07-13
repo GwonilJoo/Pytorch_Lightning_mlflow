@@ -1,15 +1,16 @@
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms
 from torch import nn, optim
 import argparse
 from tqdm import tqdm
 
-from model import CNN, PL_CNN
+from model import CNN, PL_CNN, PL_CNN2
 
-from pytorch_lightning.loggers import MLFlowLogger
+import mlflow.pytorch
+from utils import get_callback, print_auto_logged_info
+
 
 parser = argparse.ArgumentParser()
 
@@ -58,6 +59,7 @@ def go_pytorch():
     # training
     best_val_loss, best_val_acc = 2000000000, 0
 
+    
     for epoch in range(args.n_epochs):
         print('------------------')
         print(f'Epoch {epoch+1}')
@@ -107,41 +109,11 @@ def go_pytorch():
                 torch.save(model.state_dict(), PATH)
 
             print("[Validation] loss = {}, acc = {}".format(val_avg_loss, val_acc))
-        
-
-# # pl version
-# def go_pl():
-#     pl.seed_everything(args.seed)
-#     torch.manual_seed(args.seed)
-
-#     # dataloader
-#     train_loader, valid_loader = make_dataloader()
-
-#     # model
-#     model = PL_CNN()
-
-#     # trainer
-#     trainer_args={
-#         'callbacks': ModelCheckpoint(
-#             dirpath = args.save_dir,
-#             filename = 'best_val_acc',
-#             verbose = True,
-#             save_last = True,
-#             save_top_k = 1,
-#             monitor = 'val_acc',
-#             mode = 'max' 
-#         ),
-#         'gpus': args.n_gpus,
-#         'max_epochs': args.n_epochs
-#     }
-#     trainer = pl.Trainer(**trainer_args)
-#     trainer.fit(model, train_loader, valid_loader)
 
 
 # pl-mlflow version
 def go_pl():
     pl.seed_everything(args.seed)
-    torch.manual_seed(args.seed)
 
     # dataloader
     train_loader, valid_loader = make_dataloader()
@@ -149,28 +121,23 @@ def go_pl():
     # model
     model = PL_CNN()
 
-    mlf_logger = MLFlowLogger(
-        experiment_name="default",
-        tracking_uri="file:./mlruns"
-    )
-
     # trainer
+    
     trainer_args={
-        'callbacks': ModelCheckpoint(
-            dirpath = args.save_dir,
-            filename = 'best_val_acc',
-            verbose = True,
-            save_last = True,
-            save_top_k = 1,
-            monitor = 'val_acc',
-            mode = 'max' 
-        ),
+        'callbacks': get_callback(args.save_dir),
         'gpus': args.n_gpus,
         'max_epochs': args.n_epochs,
-        'logger': mlf_logger
     }
+
     trainer = pl.Trainer(**trainer_args)
-    trainer.fit(model, train_loader, valid_loader)
+
+    mlflow.set_experiment("MNIST")
+    mlflow.pytorch.autolog()
+
+    with mlflow.start_run() as run:
+        trainer.fit(model, train_loader, valid_loader)
+
+    print_auto_logged_info(mlflow.get_run(run_id=run.info.run_id))
 
 
 def main():
